@@ -1,10 +1,13 @@
 # % global __strip /bin/true
+%define         _binary_payload         w9.gzdio
+%define         _source_payload         w9.gzdio
+
 
 Name: harbour-qutenav
 
 Summary: Chart plotter / navigator for Sailfish OS
 Version: 0.51
-Release: 1
+Release: 2
 Group: Qt/Qt
 URL: https://github.com/jusirkka/qutenav
 License: GPLv3
@@ -19,7 +22,7 @@ BuildRequires:  pkgconfig(Qt5OpenGL)
 BuildRequires:  pkgconfig(glm) >= 0.9.9
 BuildRequires:  bison >= 3.1
 BuildRequires:  flex >= 2.6.1
-BuildRequires:  harfbuzz
+BuildRequires:  harfbuzz-devel
 BuildRequires:  freetype
 BuildRequires:  fontconfig
 
@@ -42,6 +45,7 @@ cd ..
 make %{?_smp_mflags} -C rpmbuilddir-%{_arch} VERBOSE=1
 
 %install
+## in sailfish.make mkdir -p %{buildroot}%{_libdir}
 make -f sailfishos.make \
   DESTDIR=%{buildroot} VERSION=%{version} \
   PREFIX=/usr BUILDDIR=rpmbuilddir-%{_arch} ARCH=%{_arch} install

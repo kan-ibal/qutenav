@@ -454,7 +454,12 @@ ChartPagePL {
       }
       onReleased: {
         var p = Qt.point(mouse.x, mouse.y);
-        if (p != first) {
+        var diffX = first.x - p.x
+      //console.log(diffX)
+        var diffY = first.y - p.y
+      //console.log(diffY)
+       //if (p != first) {
+         if ( diffX > 5 || diffY > 5) {
           if (routeButton.editing && routePoint !== undefined) {
             routePoint.selected = false;
             routePoint = undefined;
