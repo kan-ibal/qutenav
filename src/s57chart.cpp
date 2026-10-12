@@ -593,9 +593,10 @@ qreal S57Chart::scaleFactor(const QRectF& va, quint32 scale) const {
 }
 
 void S57Chart::updateModelTransform(const Camera *cam) {
-  // TODO this works only for mercator projections.
-  // Do linear approximation in general case.
   m_modelMatrix.setToIdentity();
+  if (cam == nullptr || cam->geoprojection() == nullptr || geoProjection() == nullptr) {
+    return;
+  }
   const QPointF p = cam->geoprojection()->fromWGS84(geoProjection()->reference());
   m_modelMatrix.translate(p.x(), p.y());
   if (geoProjection()->className() == "CM93Mercator") {
@@ -670,6 +671,15 @@ void S57Chart::drawAreas(const Camera* cam, int prio, bool blend) {
 
   auto f = QOpenGLContext::currentContext()->extraFunctions();
 
+  if (blend) {
+    f->glEnable(GL_BLEND);
+    f->glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+  } else {
+    f->glDisable(GL_BLEND);
+  }
+  f->glEnable(GL_DEPTH_TEST);
+  f->glDepthFunc(GL_LEQUAL);
+  f->glDisable(GL_STENCIL_TEST);
 
   while (arr != end && arr.key() == arrType) {
     auto d = dynamic_cast<const S57::TriangleArrayData*>(arr.value());
@@ -681,7 +691,6 @@ void S57Chart::drawAreas(const Camera* cam, int prio, bool blend) {
     ++arr;
   }
 
-
   while (elem != end && elem.key() == elemType) {
     auto d = dynamic_cast<const S57::TriangleElemData*>(elem.value());
     d->setUniforms();
@@ -692,10 +701,7 @@ void S57Chart::drawAreas(const Camera* cam, int prio, bool blend) {
     }
     ++elem;
   }
-
-
 }
-
 
 void S57Chart::drawLineArrays(const Camera* cam, int prio, bool blend) {
 
@@ -715,7 +721,21 @@ void S57Chart::drawLineArrays(const Camera* cam, int prio, bool blend) {
   prog->setDepth(m_priority, prio);
 
   auto f = QOpenGLContext::currentContext()->extraFunctions();
+
+  if (blend) {
+    f->glEnable(GL_BLEND);
+    f->glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+  } else {
+    f->glDisable(GL_BLEND);
+  }
+  f->glEnable(GL_DEPTH_TEST);
+  f->glDepthFunc(GL_LEQUAL);
+
+  // Bound to GL_UNIFORM_BUFFER (binding point 0) for UBO vertex shader support
+  f->glBindBufferBase(GL_UNIFORM_BUFFER, 0, m_proxy->m_dynamicCoordBuffer.bufferId());
+#ifdef GL_SHADER_STORAGE_BUFFER
   f->glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, m_proxy->m_dynamicCoordBuffer.bufferId());
+#endif
 
   while (arr != end && arr.key() == arrType) {
     auto d = dynamic_cast<const S57::LineArrayData*>(arr.value());
@@ -743,8 +763,14 @@ void S57Chart::drawSegmentArrays(const Camera* cam, int prio) {
   prog->setDepth(m_priority, prio);
 
   auto f = QOpenGLContext::currentContext()->extraFunctions();
+  f->glEnable(GL_DEPTH_TEST);
+  f->glDepthFunc(GL_LEQUAL);
 
+  // Bound to GL_UNIFORM_BUFFER (binding point 0) for UBO vertex shader support
+  f->glBindBufferBase(GL_UNIFORM_BUFFER, 0, m_proxy->m_dynamicCoordBuffer.bufferId());
+#ifdef GL_SHADER_STORAGE_BUFFER
   f->glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, m_proxy->m_dynamicCoordBuffer.bufferId());
+#endif
 
   while (arr != end && arr.key() == S57::PaintData::Type::SegmentArrays) {
     auto d = dynamic_cast<const S57::SegmentArrayData*>(arr.value());
@@ -776,8 +802,22 @@ void S57Chart::drawLineElems(const Camera* cam, int prio, bool blend) {
 
   auto f = QOpenGLContext::currentContext()->extraFunctions();
 
+  if (blend) {
+    f->glEnable(GL_BLEND);
+    f->glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+  } else {
+    f->glDisable(GL_BLEND);
+  }
+  f->glEnable(GL_DEPTH_TEST);
+  f->glDepthFunc(GL_LEQUAL);
+
+  // Bound to GL_UNIFORM_BUFFER: binding point 0 (vertex coordinates) & 1 (indices) for UBO support
+  f->glBindBufferBase(GL_UNIFORM_BUFFER, 0, m_proxy->m_staticCoordBuffer.bufferId());
+  f->glBindBufferBase(GL_UNIFORM_BUFFER, 1, m_proxy->m_staticIndexBuffer.bufferId());
+#ifdef GL_SHADER_STORAGE_BUFFER
   f->glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, m_proxy->m_staticCoordBuffer.bufferId());
   f->glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, m_proxy->m_staticIndexBuffer.bufferId());
+#endif
 
   while (elem != end && elem.key() == elemType) {
     auto d = dynamic_cast<const S57::LineElemData*>(elem.value());
@@ -807,6 +847,10 @@ void S57Chart::drawText(const Camera* cam) {
   prog->setDepth(m_priority, textPrio);
 
   auto f = QOpenGLContext::currentContext()->extraFunctions();
+  f->glEnable(GL_BLEND);
+  f->glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+  f->glEnable(GL_DEPTH_TEST);
+  f->glDepthFunc(GL_LEQUAL);
 
   while (elem != end && elem.key() == S57::PaintData::Type::TextElements) {
     auto d = dynamic_cast<const S57::TextElemData*>(elem.value());
@@ -835,6 +879,10 @@ void S57Chart::drawRasterSymbols(const Camera* cam, int prio) {
   prog->setDepth(m_priority, prio);
 
   auto f = QOpenGLContext::currentContext()->extraFunctions();
+  f->glEnable(GL_BLEND);
+  f->glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+  f->glEnable(GL_DEPTH_TEST);
+  f->glDepthFunc(GL_LEQUAL);
 
   while (elem != end && elem.key() == S57::PaintData::Type::RasterSymbols) {
     auto d = dynamic_cast<const S57::RasterSymbolPaintData*>(elem.value());
@@ -876,6 +924,12 @@ void S57Chart::drawVectorSymbols(const Camera* cam, int prio, bool blend) {
   prog->setDepth(m_priority, prio);
 
   auto f = QOpenGLContext::currentContext()->extraFunctions();
+  if (blend) {
+    f->glEnable(GL_BLEND);
+    f->glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+  }
+  f->glEnable(GL_DEPTH_TEST);
+  f->glDepthFunc(GL_LEQUAL);
 
   while (elem != end && elem.key() == elemType) {
     auto d = dynamic_cast<const S57::VectorSymbolPaintData*>(elem.value());
@@ -916,6 +970,7 @@ void S57Chart::drawRasterPatterns(const Camera *cam) {
 
   auto f = QOpenGLContext::currentContext()->extraFunctions();
   f->glEnable(GL_STENCIL_TEST);
+  f->glStencilMask(0xff);
 
   const auto t = S57::PaintData::Type::RasterPatterns;
   using Data = S57::PatternPaintData::AreaData;
@@ -984,6 +1039,10 @@ void S57Chart::drawRasterPatterns(const Camera *cam) {
   }
 
   f->glDisable(GL_STENCIL_TEST);
+  f->glStencilMask(0xff);
+  f->glDepthMask(true);
+  f->glColorMask(true, true, true, true);
+  f->glEnable(GL_DEPTH_TEST);
 }
 
 
@@ -991,6 +1050,7 @@ void S57Chart::drawVectorPatterns(const Camera *cam) {
 
   auto f = QOpenGLContext::currentContext()->extraFunctions();
   f->glEnable(GL_STENCIL_TEST);
+  f->glStencilMask(0xff);
 
   const auto t = S57::PaintData::Type::VectorPatterns;
   using Data = S57::PatternPaintData::AreaData;
@@ -1060,6 +1120,9 @@ void S57Chart::drawVectorPatterns(const Camera *cam) {
   }
 
   f->glDisable(GL_STENCIL_TEST);
+  f->glStencilMask(0xff);
+  f->glDepthMask(true);
+  f->glColorMask(true, true, true, true);
   f->glEnable(GL_DEPTH_TEST);
 }
 

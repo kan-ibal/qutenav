@@ -2,8 +2,8 @@
 
 BASE       = qutenav
 NAME       = harbour-$(BASE)
-BASEUPD	   = $(BASE)_dbupdater
-UPD	   = harbour_$(BASEUPD)
+BASEUPD    = $(BASE)_dbupdater
+UPD        = harbour_$(BASEUPD)
 VERSION    =
 
 DESTDIR    =
@@ -12,7 +12,11 @@ DATADIR    = $(DESTDIR)$(PREFIX)/share/$(NAME)
 DESKTOPDIR = $(DESTDIR)$(PREFIX)/share/applications
 ICONDIR    = $(DESTDIR)$(PREFIX)/share/icons/hicolor
 BINDIR     = $(DESTDIR)$(PREFIX)/bin
-LIBDIR     = $(DESTDIR)$(PREFIX)/lib
+ifeq ($(ARCH),arm)
+    LIBDIR     = $(DESTDIR)$(PREFIX)/lib
+else ifeq ($(ARCH),aarch64)
+    LIBDIR     = $(DESTDIR)$(PREFIX)/lib64
+endif
 
 ICONS = data/$(BASE)-48x48.png \
         data/$(BASE)-64x64.png \

@@ -1,4 +1,4 @@
-# % global __strip /bin/true
+ # % global __strip /bin/true
 %define         _binary_payload         w9.gzdio
 %define         _source_payload         w9.gzdio
 
@@ -7,7 +7,7 @@ Name: harbour-qutenav
 
 Summary: Chart plotter / navigator for Sailfish OS
 Version: 0.51
-Release: 2
+Release: 3
 Group: Qt/Qt
 URL: https://github.com/jusirkka/qutenav
 License: GPLv3
