@@ -811,10 +811,22 @@ void S57Chart::drawLineElems(const Camera* cam, int prio, bool blend) {
   f->glEnable(GL_DEPTH_TEST);
   f->glDepthFunc(GL_LEQUAL);
 
+  // Ensure Uniform Block Bindings are explicitly connected to Binding Points 0 and 1
+  GLuint progId = prog->prog()->programId();
+  GLuint vbIdx = f->glGetUniformBlockIndex(progId, "VertexBufferIn");
+  if (vbIdx != GL_INVALID_INDEX) {
+    f->glUniformBlockBinding(progId, vbIdx, 0);
+  }
+  GLuint ibIdx = f->glGetUniformBlockIndex(progId, "IndexBufferIn");
+  if (ibIdx != GL_INVALID_INDEX) {
+    f->glUniformBlockBinding(progId, ibIdx, 1);
+  }
+
   // Bound to GL_UNIFORM_BUFFER: binding point 0 (vertex coordinates) & 1 (indices) for UBO support
   f->glBindBufferBase(GL_UNIFORM_BUFFER, 0, m_proxy->m_staticCoordBuffer.bufferId());
   f->glBindBufferBase(GL_UNIFORM_BUFFER, 1, m_proxy->m_staticIndexBuffer.bufferId());
 #ifdef GL_SHADER_STORAGE_BUFFER
+  // When SSBO is supported, also bind full storage buffers
   f->glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, m_proxy->m_staticCoordBuffer.bufferId());
   f->glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, m_proxy->m_staticIndexBuffer.bufferId());
 #endif
