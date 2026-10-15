@@ -155,28 +155,13 @@ void Globe::initializeGL() {
   m_indexCount = p.triangles().size();
 
   m_program->setAttributeBuffer(0, GL_FLOAT, 0, 3, 0);
-  m_program->enableAttributeArray(0);
+  m_program->disableAttributeArray(0);
+  m_coordBuffer.release();
+  m_indexBuffer.release();
+  m_program->release();
 
-  // cubemap texture loading:
-  // Support both single composite image (texture.png/jpg) and 6 individual face images (*.jpg/png)
-  QStringList compositeCandidates = globeDir.entryList(
-    QStringList() << "texture.png" << "texture.jpg" << "texture.jpeg"
-                  << "globe.png" << "globe.jpg" << "cubemap.png" << "cubemap.jpg",
-    QDir::Files | QDir::Readable);
-
-  QStringList multiCandidates = globeDir.entryList(
-    QStringList() << "*.jpg" << "*.jpeg" << "*.png" << "*.JPG" << "*.PNG" << "*.JPEG",
-    QDir::Files | QDir::Readable);
-
-  if (!compositeCandidates.isEmpty() && multiCandidates.size() < 6) {
-    loadImage(globeDir);
-  } else if (!multiCandidates.isEmpty()) {
-    loadImages(globeDir);
-  } else if (!compositeCandidates.isEmpty()) {
-    loadImage(globeDir);
-  } else {
-    qWarning() << "No globe texture images found in" << globeDir.absolutePath();
-  }
+  // cubemap texture loading: only the 6 named cubemap face images are supported
+  loadImages(globeDir);
 }
 
 void Globe::updateCharts(const Camera* /*cam*/, const QRectF& /*viewArea*/) {
@@ -206,6 +191,10 @@ void Globe::paintGL(const Camera *cam) {
 
   if (m_globeTexture && m_globeTexture->isCreated()) {
     m_globeTexture->bind(0);
+  } else {
+    f->glActiveTexture(GL_TEXTURE0);
+    f->glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
+    f->glBindTexture(GL_TEXTURE_2D, 0);
   }
 
   const QVector3D eye = cam->view().inverted().column(3).toVector3D();
@@ -266,6 +255,10 @@ void Globe::paintGL(const Camera *cam) {
   // 4. Release cubemap texture so it does not conflict with 2D chart textures on unit 0
   if (m_globeTexture && m_globeTexture->isCreated()) {
     m_globeTexture->release();
+  } else {
+    f->glActiveTexture(GL_TEXTURE0);
+    f->glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
+    f->glBindTexture(GL_TEXTURE_2D, 0);
   }
 
   // 5. Ensure depth test function is GL_LEQUAL and depth mask is true so chart borders are visible
@@ -286,23 +279,8 @@ void Globe::loadImages(const QDir& imageDir) {
     QDir::Files | QDir::Readable, QDir::Name);
   qDebug() << "Found globe face files:" << imageFiles;
 
-  // If fewer than 6 face files exist, attempt loading a composite image instead
-  if (imageFiles.size() < 6) {
-    loadImage(imageDir);
-    return;
-  }
-
-  // Map files to cubemap faces by inspecting filenames (handles posx/negx/etc. naming)
+  // Map files strictly to the 6 cubemap faces by inspecting filenames (negx/posx/negy/posy/negz/posz)
   QMap<QOpenGLTexture::CubeMapFace, QImage> faceMap;
-
-  const QVector<QOpenGLTexture::CubeMapFace> fallbackFaces {
-    QOpenGLTexture::CubeMapNegativeX,
-    QOpenGLTexture::CubeMapNegativeY,
-    QOpenGLTexture::CubeMapNegativeZ,
-    QOpenGLTexture::CubeMapPositiveX,
-    QOpenGLTexture::CubeMapPositiveY,
-    QOpenGLTexture::CubeMapPositiveZ,
-  };
 
   for (const QString& file: imageFiles) {
     QString lower = file.toLower();
@@ -324,19 +302,9 @@ void Globe::loadImages(const QDir& imageDir) {
     }
   }
 
-  // If filename-based matching did not resolve all 6 faces, use alphabetical order
   if (faceMap.size() < 6) {
-    faceMap.clear();
-    for (int i = 0; i < qMin(imageFiles.size(), fallbackFaces.size()); ++i) {
-      QImage img = QImage(imageDir.absoluteFilePath(imageFiles[i])).convertToFormat(QImage::Format_RGBA8888);
-      if (!img.isNull()) {
-        faceMap[fallbackFaces[i]] = img;
-      }
-    }
-  }
-
-  if (faceMap.isEmpty()) {
-    qWarning() << "Failed to load any valid globe images from" << imageDir.absolutePath();
+    qWarning() << "Failed to find all 6 required cubemap face images in" << imageDir.absolutePath()
+               << "(found" << faceMap.size() << "of 6)";
     return;
   }
 
@@ -381,67 +349,7 @@ void Globe::loadImages(const QDir& imageDir) {
   m_globeTexture->setMagnificationFilter(QOpenGLTexture::Linear);
 }
 
-void Globe::loadImage(const QDir& imageDir) {
-  // Support composite cross images (texture.png, texture.jpg, globe.png, etc.)
-  auto imageFiles = imageDir.entryList(
-    QStringList() << "texture.png" << "texture.jpg" << "texture.jpeg"
-                  << "globe.png" << "globe.jpg" << "cubemap.png" << "cubemap.jpg",
-    QDir::Files | QDir::Readable, QDir::Name);
-  qDebug() << "Composite image candidates:" << imageFiles;
-
-  if (imageFiles.isEmpty()) {
-    qWarning() << "No composite texture file found in" << imageDir.absolutePath();
-    return;
-  }
-
-  auto image = QImage(imageDir.absoluteFilePath(imageFiles.first()))
-      .convertToFormat(QImage::Format_RGBA8888);
-
-  if (image.isNull() || image.width() < 4 || image.height() < 3) {
-    qWarning() << "Invalid composite texture image in" << imageFiles.first();
-    return;
-  }
-
-  const int w = image.width() / 4;
-  const int h = image.height() / 3;
-
-  if (m_globeTexture->isCreated()) {
-    m_globeTexture->destroy();
-  }
-  m_globeTexture->create();
-  m_globeTexture->bind(0);
-
-  // Set 2D face dimensions for TargetCubeMap (depth is 1, not image.depth() which is 32 bits!)
-  m_globeTexture->setSize(w, h);
-  m_globeTexture->setFormat(QOpenGLTexture::RGBA8_UNorm);
-  m_globeTexture->allocateStorage();
-
-  struct CubeData {
-    QOpenGLTexture::CubeMapFace face;
-    int xOffset;
-    int yOffset;
-  };
-
-  QVector<CubeData> faces {
-    {QOpenGLTexture::CubeMapNegativeX, 0, h},     // left
-    {QOpenGLTexture::CubeMapPositiveX, 2 * w, h}, // right
-    {QOpenGLTexture::CubeMapNegativeY, w, 2 * h}, // bottom
-    {QOpenGLTexture::CubeMapPositiveY, w, 0},     // top
-    {QOpenGLTexture::CubeMapNegativeZ, 3 * w, h}, // back
-    {QOpenGLTexture::CubeMapPositiveZ, w, h},     // front
-  };
-
-  for (const CubeData& face: faces) {
-    auto subimage = image.copy(face.xOffset, face.yOffset, w, h);
-    m_globeTexture->setData(0, 0, face.face,
-                            QOpenGLTexture::RGBA, QOpenGLTexture::UInt8,
-                            subimage.constBits(), nullptr);
-  }
-
-  m_globeTexture->setWrapMode(QOpenGLTexture::ClampToEdge);
-  // Generating mipmaps ensures texture is complete and visible when sampled with LinearMipMapLinear
-  m_globeTexture->generateMipMaps();
-  m_globeTexture->setMinificationFilter(QOpenGLTexture::LinearMipMapLinear);
-  m_globeTexture->setMagnificationFilter(QOpenGLTexture::Linear);
+void Globe::loadImage(const QDir& /*imageDir*/) {
+  // Removed: composite single-image sphere textures are disabled
 }
 

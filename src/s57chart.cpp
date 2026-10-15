@@ -647,6 +647,13 @@ void S57Chart::findUnderling(S57::Object* overling,
 }
 
 void S57Chart::drawAreas(const Camera* cam, int prio, bool blend) {
+  // In globe view (cam has no 2D geoprojection), 2D S-52 planar area meshes (TriangleArrays)
+  // must not be drawn into the 3D globe viewport. They are planar Mercator coordinates that
+  // are not aligned with earth map north / south spherical coordinates, producing a superfluous
+  // green array over the globe. Geodesic chart boundaries are handled exclusively by Outliner.
+  if (cam == nullptr || cam->geoprojection() == nullptr || geoProjection() == nullptr) {
+    return;
+  }
 
   const S57::PaintIterator end = m_paintData[prio].constEnd();
 
@@ -704,6 +711,9 @@ void S57Chart::drawAreas(const Camera* cam, int prio, bool blend) {
 }
 
 void S57Chart::drawLineArrays(const Camera* cam, int prio, bool blend) {
+  if (cam == nullptr || cam->geoprojection() == nullptr || geoProjection() == nullptr) {
+    return;
+  }
 
   const S57::PaintIterator end = m_paintData[prio].constEnd();
 
@@ -749,6 +759,9 @@ void S57Chart::drawLineArrays(const Camera* cam, int prio, bool blend) {
 }
 
 void S57Chart::drawSegmentArrays(const Camera* cam, int prio) {
+  if (cam == nullptr || cam->geoprojection() == nullptr || geoProjection() == nullptr) {
+    return;
+  }
 
   const S57::PaintIterator end = m_paintData[prio].constEnd();
 
@@ -784,6 +797,9 @@ void S57Chart::drawSegmentArrays(const Camera* cam, int prio) {
 }
 
 void S57Chart::drawLineElems(const Camera* cam, int prio, bool blend) {
+  if (cam == nullptr || cam->geoprojection() == nullptr || geoProjection() == nullptr) {
+    return;
+  }
 
   const S57::PaintIterator end = m_paintData[prio].constEnd();
 
@@ -843,6 +859,9 @@ void S57Chart::drawLineElems(const Camera* cam, int prio, bool blend) {
 }
 
 void S57Chart::drawText(const Camera* cam) {
+  if (cam == nullptr || cam->geoprojection() == nullptr || geoProjection() == nullptr) {
+    return;
+  }
 
   const S57::PaintIterator end = m_paintData[textPrio].constEnd();
 
@@ -875,6 +894,9 @@ void S57Chart::drawText(const Camera* cam) {
 }
 
 void S57Chart::drawRasterSymbols(const Camera* cam, int prio) {
+  if (cam == nullptr || cam->geoprojection() == nullptr || geoProjection() == nullptr) {
+    return;
+  }
 
   const S57::PaintIterator end = m_paintData[prio].constEnd();
 
@@ -913,6 +935,9 @@ void S57Chart::drawRasterSymbols(const Camera* cam, int prio) {
 
 
 void S57Chart::drawVectorSymbols(const Camera* cam, int prio, bool blend) {
+  if (cam == nullptr || cam->geoprojection() == nullptr || geoProjection() == nullptr) {
+    return;
+  }
 
   const S57::PaintIterator end = m_paintData[prio].constEnd();
 
@@ -979,6 +1004,9 @@ void S57Chart::drawVectorSymbols(const Camera* cam, int prio, bool blend) {
 }
 
 void S57Chart::drawRasterPatterns(const Camera *cam) {
+  if (cam == nullptr || cam->geoprojection() == nullptr || geoProjection() == nullptr) {
+    return;
+  }
 
   auto f = QOpenGLContext::currentContext()->extraFunctions();
   f->glEnable(GL_STENCIL_TEST);
@@ -1059,6 +1087,9 @@ void S57Chart::drawRasterPatterns(const Camera *cam) {
 
 
 void S57Chart::drawVectorPatterns(const Camera *cam) {
+  if (cam == nullptr || cam->geoprojection() == nullptr || geoProjection() == nullptr) {
+    return;
+  }
 
   auto f = QOpenGLContext::currentContext()->extraFunctions();
   f->glEnable(GL_STENCIL_TEST);
